@@ -1,0 +1,85 @@
+# Please refer https://aka.ms/HTTPSinContainer on how to setup an https developer certificate for your ASP .NET Core service.
+
+version: '3.4'
+
+services:
+  catalogdb:
+    container_name: catalogdb
+    restart: always
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_data:/data/db
+
+  basketdb:
+    container_name: basketdb
+    restart: always
+    ports:
+      - 6379:6379
+
+  portainer:
+    container_name: portainer
+    restart: always
+    ports:
+      - 8080:8080
+      - 9000:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+  discountdb:
+    container_name: discountdb
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin1234
+      - POSTGRES_DB=DiscountDb
+    restart: always
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  catalogapi:
+    image: catalogapi
+    build:
+      context: .
+      dockerfile: src/Services/Catalog/Catalog.API/Dockerfile
+    ports:
+      - 8000:8000
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - 'DatabaseSettings:ConnectionString=mongodb://catalogdb:27017'
+    volumes:
+      - ~/.vsdbg:/remote_debugger:rw
+    depends_on:
+      - catalogdb
+
+  basketapi:
+    image: basketapi
+    build:
+      context: .
+      dockerfile: src/Services/Basket/Basket.API/Dockerfile
+    ports:
+      - 8001:8001
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - 'CacheSettings:ConnectionString=basketdb:6379'
+    volumes:
+      - ~/.vsdbg:/remote_debugger:rw
+    depends_on:
+      - basketdb
+
+  discountapi:
+    image: discountapi
+    build:
+      context: .
+      dockerfile: src/Services/Discount/Discount.API/Dockerfile
+    ports:
+      - 8002:8002
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - 'DatabaseSettings:ConnectionString=Server=discountdb;port=5432;Database=DiscountDb;User Id=admin;Password=admin1234'
+    volumes:
+      - ~/.vsdbg:/remote_debugger:rw
+    depends_on:
+      - discountdb
